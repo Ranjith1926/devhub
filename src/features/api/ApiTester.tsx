@@ -151,8 +151,20 @@ export function ApiTester() {
           url: request.url,
           headers,
           params,
-          body: request.bodyType !== 'none' ? request.body : null,
+          body: (request.bodyType !== 'none' && request.bodyType !== 'form') ? request.body : null,
           body_type: request.bodyType,
+          // form fields sent as [[key, value], ...] for multipart encoding in Rust
+          form_fields: request.bodyType === 'form'
+            ? (() => {
+                try {
+                  const fields: { id: string; key: string; value: string; enabled: boolean }[] =
+                    JSON.parse(request.body || '[]');
+                  return fields
+                    .filter((f) => f.enabled && f.key.trim())
+                    .map((f) => [f.key, f.value] as [string, string]);
+                } catch { return []; }
+              })()
+            : [],
         },
       });
 
