@@ -17,6 +17,9 @@
         "all": false,
         "open": true
       },
+      "window": {
+        "all": true
+      },
       "dialog": {
         "all": true
       },
@@ -66,7 +69,7 @@
         "minHeight": 620,
         "resizable": true,
         "fullscreen": false,
-        "decorations": true,
+        "decorations": false,
         "center": true,
         "focus": true
       }

@@ -5,6 +5,7 @@ import { save, open as openDialog } from '@tauri-apps/api/dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/api/fs';
 import { Sidebar } from './components/Layout/Sidebar';
 import { TabBar } from './components/Layout/TabBar';
+import { TitleBar } from './components/Layout/TitleBar';
 import { ApiTester } from './features/api';
 import { JsonTools } from './features/json-tools/JsonTools';
 import { Snippets } from './features/snippets/Snippets';
@@ -280,7 +281,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-gh-canvas text-gh-fg font-sans">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-gh-canvas text-gh-fg font-sans">
+      {/* Custom themed titlebar */}
+      <TitleBar />
       <Toaster
         position="bottom-right"
         toastOptions={{
@@ -300,19 +303,22 @@ export default function App() {
         onThemeChange={setTheme}
       />
 
-      {/* Sidebar */}
-      <Sidebar
-        onExport={handleExport}
-        onImport={handleImport}
-        onSettings={() => setSettingsOpen(true)}
-      />
+      {/* Sidebar + main */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Sidebar */}
+        <Sidebar
+          onExport={handleExport}
+          onImport={handleImport}
+          onSettings={() => setSettingsOpen(true)}
+        />
 
-      {/* Main area */}
-      <div className="flex flex-col flex-1 min-w-0">
-        <TabBar />
-        <main className="flex-1 overflow-hidden">
-          {renderPanel()}
-        </main>
+        {/* Main area */}
+        <div className="flex flex-col flex-1 min-w-0">
+          <TabBar />
+          <main className="flex-1 overflow-hidden">
+            {renderPanel()}
+          </main>
+        </div>
       </div>
     </div>
   );

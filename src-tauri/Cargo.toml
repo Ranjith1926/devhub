@@ -21,7 +21,7 @@ tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
 # Tauri core — only enable the allowlisted features we actually use
-tauri = { version = "1.6", features = [ "shell-open", "dialog-all", "fs-all",
+tauri = { version = "1.6", features = [ "window-all", "shell-open", "dialog-all", "fs-all",
   "path-all",
 ] }
 
