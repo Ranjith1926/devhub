@@ -9,12 +9,16 @@ import { ApiTester } from './features/api';
 import { JsonTools } from './features/json-tools/JsonTools';
 import { Snippets } from './features/snippets/Snippets';
 import { Database } from './features/database/Database';
+import { AuthPage } from './features/auth/AuthPage';
 import { Modal } from './components/ui/Modal';
 import { useAppStore } from './store/appStore';
 import { useSnippetStore } from './store/snippetStore';
 import { useApiStore } from './store/apiStore';
+import { useAuthStore } from './store/authStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useToast } from './hooks/useToast';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './lib/firebase';
 import {
   Send, Braces, Bookmark, Database as DbIcon,
   Keyboard, Info, Moon, Sun,
@@ -162,12 +166,31 @@ export default function App() {
   const { tabs, activeTabId, openFeature } = useAppStore();
   const { setSnippets } = useSnippetStore();
   const { setCollections } = useApiStore();
+  const { user, setUser } = useAuthStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem('devhub-theme');
     return saved === 'light' ? 'light' : 'dark';
   });
   const toast = useToast();
+
+  // Sync Firebase auth state
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+        });
+      } else {
+        setUser(null);
+      }
+      setAuthReady(true);
+    });
+    return unsub;
+  }, [setUser]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -202,7 +225,6 @@ export default function App() {
       if (!path || Array.isArray(path)) return;
       const json = await readTextFile(path as string);
       const msg = await invoke<string>('import_data', { json });
-      // Reload stores from DB
       const [collections, snippets] = await Promise.all([
         invoke<any[]>('get_collections'),
         invoke<any[]>('get_snippets'),
@@ -226,6 +248,20 @@ export default function App() {
   ]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  // Wait for Firebase to restore session before deciding what to render
+  if (!authReady) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-gh-canvas">
+        <div className="w-6 h-6 rounded-full border-2 border-gh-accent border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  // Show auth page when no user is logged in
+  if (!user) {
+    return <AuthPage />;
+  }
 
   function renderPanel() {
     if (!activeTab) return null;
