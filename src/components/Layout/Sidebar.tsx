@@ -15,6 +15,7 @@ import {
   Upload,
   ChevronLeft,
   ChevronRight,
+  LogIn,
 } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip';
 import { useAppStore } from '../../store/appStore';
@@ -148,6 +149,19 @@ export function Sidebar({ onExport, onImport, onSettings }: SidebarProps) {
             className="flex items-center justify-center w-10 h-10 rounded-lg text-gh-fg-subtle hover:text-gh-fg hover:bg-gh-subtle transition-colors"
           >
             <Settings size={16} />
+          </button>
+        </Tooltip>
+
+        <Tooltip content="Login  —  Coming Soon" position="right">
+          <button
+            disabled
+            aria-label="Login (Coming Soon)"
+            className="relative flex items-center justify-center w-10 h-10 rounded-lg text-gh-fg-subtle/40 cursor-not-allowed"
+          >
+            <LogIn size={16} />
+            <span className="absolute -top-0.5 -right-0.5 text-[8px] font-semibold leading-none bg-gh-accent text-white rounded px-0.5 py-px">
+              Soon
+            </span>
           </button>
         </Tooltip>
       </div>
