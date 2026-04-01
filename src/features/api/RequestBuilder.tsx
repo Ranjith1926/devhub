@@ -20,13 +20,13 @@ import { BodyType, HttpMethod, KeyValuePair } from '../../types';
 const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 
 const METHOD_COLORS: Record<HttpMethod, string> = {
-  GET:     'text-green-400',
-  POST:    'text-blue-400',
-  PUT:     'text-amber-400',
-  PATCH:   'text-amber-400',
-  DELETE:  'text-red-400',
-  HEAD:    'text-purple-400',
-  OPTIONS: 'text-pink-400',
+  GET:     'text-green-600 dark:text-green-400',
+  POST:    'text-blue-600 dark:text-blue-400',
+  PUT:     'text-amber-600 dark:text-amber-400',
+  PATCH:   'text-amber-600 dark:text-amber-400',
+  DELETE:  'text-red-600 dark:text-red-400',
+  HEAD:    'text-purple-600 dark:text-purple-400',
+  OPTIONS: 'text-pink-600 dark:text-pink-400',
 };
 
 function MethodSelect() {

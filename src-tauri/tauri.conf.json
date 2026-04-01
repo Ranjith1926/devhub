@@ -17,6 +17,9 @@
         "all": false,
         "open": true
       },
+      "window": {
+        "all": true
+      },
       "dialog": {
         "all": true
       },
@@ -26,7 +29,13 @@
           "$APPDATA/**",
           "$DOWNLOAD/**",
           "$DOCUMENT/**",
-          "$DESKTOP/**"
+          "$DESKTOP/**",
+          "$HOME/**",
+          "$PICTURE/**",
+          "$PUBLIC/**",
+          "$TEMP/**",
+          "$CONFIG/**",
+          "$DATA/**"
         ]
       },
       "path": {
@@ -38,10 +47,11 @@
       "targets": "all",
       "identifier": "com.devhub.app",
       "icon": [
-        "icons/icon-32x32.png",
-        "icons/icon-128x128.png",
-        "icons/icon-256x256.png",
-        "icons/icon.ico"
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.ico",
+        "icons/icon.icns"
       ],
       "resources": [],
       "externalBin": [],
@@ -66,7 +76,7 @@
         "minHeight": 620,
         "resizable": true,
         "fullscreen": false,
-        "decorations": true,
+        "decorations": false,
         "center": true,
         "focus": true
       }

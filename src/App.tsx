@@ -5,6 +5,7 @@ import { save, open as openDialog } from '@tauri-apps/api/dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/api/fs';
 import { Sidebar } from './components/Layout/Sidebar';
 import { TabBar } from './components/Layout/TabBar';
+import { TitleBar } from './components/Layout/TitleBar';
 import { ApiTester } from './features/api';
 import { JsonTools } from './features/json-tools/JsonTools';
 import { Snippets } from './features/snippets/Snippets';
@@ -151,6 +152,7 @@ function SettingsModal({
           <div>
             <p className="text-xs font-semibold text-gh-fg">DevHub v0.1.0</p>
             <p className="text-[11px] text-gh-fg-muted">All-in-one developer productivity tool</p>
+            <p className="text-[11px] text-gh-fg-muted mt-0.5">© 2026 Ranjith Kumar. All rights reserved.</p>
           </div>
         </div>
       </section>
@@ -165,7 +167,7 @@ function SettingsModal({
 export default function App() {
   const { tabs, activeTabId, openFeature } = useAppStore();
   const { setSnippets } = useSnippetStore();
-  const { setCollections } = useApiStore();
+  const { setCollections, setHistory } = useApiStore();
   const { user, setUser } = useAuthStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [authReady, setAuthReady] = useState(false);
@@ -211,6 +213,7 @@ export default function App() {
       await writeTextFile(path, json);
       toast.success('Data exported successfully');
     } catch (e) {
+      console.error('[DevHub] Export error:', e);
       toast.error(`Export failed: ${e}`);
     }
   }, []);
@@ -224,18 +227,47 @@ export default function App() {
       });
       if (!path || Array.isArray(path)) return;
       const json = await readTextFile(path as string);
+
+      // Validate the file is a DevHub export before sending to the backend
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(json);
+      } catch {
+        toast.error('Import failed: file is not valid JSON');
+        return;
+      }
+      const p = parsed as Record<string, unknown>;
+      if (!p.version || !Array.isArray(p.collections) || !Array.isArray(p.snippets)) {
+        toast.error('Import failed: this file is not a valid DevHub export. Use the Export button to generate one first.');
+        return;
+      }
+
       const msg = await invoke<string>('import_data', { json });
-      const [collections, snippets] = await Promise.all([
-        invoke<any[]>('get_collections'),
-        invoke<any[]>('get_snippets'),
-      ]);
-      setCollections(collections);
+
+      // Reload snippets
+      const snippets = await invoke<any[]>('get_snippets');
       setSnippets(snippets);
+
+      // Reload collections with their requests
+      const rawCollections = await invoke<any[]>('get_collections');
+      const fullCollections = await Promise.all(
+        rawCollections.map(async (c) => {
+          const requests = await invoke<any[]>('get_requests', { collectionId: c.id });
+          return { ...c, requests };
+        }),
+      );
+      setCollections(fullCollections);
+
+      // Reload history
+      const history = await invoke<any[]>('get_request_history');
+      setHistory(history);
+
       toast.success(msg);
     } catch (e) {
+      console.error('[DevHub] Import error:', e);
       toast.error(`Import failed: ${e}`);
     }
-  }, [setCollections, setSnippets]);
+  }, [setCollections, setHistory, setSnippets]);
 
   // Global keyboard shortcuts
   useKeyboardShortcuts([
@@ -280,7 +312,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-gh-canvas text-gh-fg font-sans">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-gh-canvas text-gh-fg font-sans">
+      {/* Custom themed titlebar */}
+      <TitleBar />
       <Toaster
         position="bottom-right"
         toastOptions={{
@@ -300,19 +334,22 @@ export default function App() {
         onThemeChange={setTheme}
       />
 
-      {/* Sidebar */}
-      <Sidebar
-        onExport={handleExport}
-        onImport={handleImport}
-        onSettings={() => setSettingsOpen(true)}
-      />
+      {/* Sidebar + main */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Sidebar */}
+        <Sidebar
+          onExport={handleExport}
+          onImport={handleImport}
+          onSettings={() => setSettingsOpen(true)}
+        />
 
-      {/* Main area */}
-      <div className="flex flex-col flex-1 min-w-0">
-        <TabBar />
-        <main className="flex-1 overflow-hidden">
-          {renderPanel()}
-        </main>
+        {/* Main area */}
+        <div className="flex flex-col flex-1 min-w-0">
+          <TabBar />
+          <main className="flex-1 overflow-hidden">
+            {renderPanel()}
+          </main>
+        </div>
       </div>
     </div>
   );

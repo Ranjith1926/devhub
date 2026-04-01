@@ -1,7 +1,7 @@
 // commands/storage.rs — Export all app data to JSON and import it back.
 
 use crate::db::get_conn;
-use crate::models::{Collection, ExportData, SavedRequest, Snippet};
+use crate::models::{Collection, ExportData, HistoryEntry, SavedRequest, Snippet};
 use chrono::Utc;
 
 // ---------------------------------------------------------------------------
@@ -82,12 +82,36 @@ pub fn export_data() -> Result<String, String> {
         .filter_map(|r| r.ok())
         .collect();
 
+    // --- History ---
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, method, url, status, response_time, created_at
+             FROM request_history
+             ORDER BY created_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+    let history: Vec<HistoryEntry> = stmt
+        .query_map([], |row| {
+            Ok(HistoryEntry {
+                id: row.get(0)?,
+                method: row.get(1)?,
+                url: row.get(2)?,
+                status: row.get(3)?,
+                response_time: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
     let envelope = ExportData {
         version: "1.0".to_string(),
         exported_at: Utc::now().to_rfc3339(),
         collections,
         requests,
         snippets,
+        history,
     };
 
     serde_json::to_string_pretty(&envelope).map_err(|e| e.to_string())
@@ -149,8 +173,23 @@ pub fn import_data(json: String) -> Result<String, String> {
         imported_snippets += n;
     }
 
+    let mut imported_history = 0usize;
+    for entry in &envelope.history {
+        let n = conn.execute(
+            "INSERT OR IGNORE INTO request_history
+                (id, method, url, status, response_time, created_at)
+             VALUES (?1,?2,?3,?4,?5,?6)",
+            rusqlite::params![
+                entry.id, entry.method, entry.url,
+                entry.status, entry.response_time, entry.created_at,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        imported_history += n;
+    }
+
     Ok(format!(
-        "Imported {} collection(s), {} request(s), {} snippet(s).",
-        imported_collections, imported_requests, imported_snippets
+        "Imported {} collection(s), {} request(s), {} snippet(s), {} history entry/entries.",
+        imported_collections, imported_requests, imported_snippets, imported_history
     ))
 }

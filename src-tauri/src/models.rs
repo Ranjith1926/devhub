@@ -77,4 +77,7 @@ pub struct ExportData {
     pub collections: Vec<Collection>,
     pub requests: Vec<SavedRequest>,
     pub snippets: Vec<Snippet>,
+    /// Request history — optional so old export files remain compatible.
+    #[serde(default)]
+    pub history: Vec<HistoryEntry>,
 }
