@@ -263,10 +263,25 @@ const BODY_TYPES: { value: BodyType; label: string }[] = [
   { value: 'none', label: 'None' },
   { value: 'json', label: 'JSON' },
   { value: 'text', label: 'Text' },
+  { value: 'form', label: 'Form Data' },
 ];
 
 function BodyEditor() {
   const { request, setBody, setBodyType } = useApiStore();
+
+  // Parse / serialise form fields stored as JSON in request.body
+  const formFields: KeyValuePair[] = React.useMemo(() => {
+    if (request.bodyType !== 'form') return [];
+    try {
+      const parsed = JSON.parse(request.body || '[]');
+      if (Array.isArray(parsed)) return parsed;
+    } catch { /* ignore */ }
+    return [{ id: uuidv4(), key: '', value: '', enabled: true }];
+  }, [request.body, request.bodyType]);
+
+  const handleFormChange = (rows: KeyValuePair[]) => {
+    setBody(JSON.stringify(rows));
+  };
 
   return (
     <div className="flex flex-col gap-2 h-full">
@@ -275,7 +290,14 @@ function BodyEditor() {
         {BODY_TYPES.map((bt) => (
           <button
             key={bt.value}
-            onClick={() => setBodyType(bt.value)}
+            onClick={() => {
+              setBodyType(bt.value);
+              if (bt.value === 'form') {
+                setBody(JSON.stringify([{ id: uuidv4(), key: '', value: '', enabled: true }]));
+              } else if (bt.value !== request.bodyType) {
+                setBody('');
+              }
+            }}
             className={[
               'px-2.5 py-1 text-xs transition-colors',
               request.bodyType === bt.value
@@ -288,8 +310,20 @@ function BodyEditor() {
         ))}
       </div>
 
-      {/* Editor */}
-      {request.bodyType !== 'none' ? (
+      {/* Form Data — KV table */}
+      {request.bodyType === 'form' && (
+        <div className="flex-1 overflow-y-auto">
+          <KVTable
+            rows={formFields}
+            onChange={handleFormChange}
+            keyPlaceholder="Field name"
+            valuePlaceholder="Value"
+          />
+        </div>
+      )}
+
+      {/* Code editor for JSON / text */}
+      {(request.bodyType === 'json' || request.bodyType === 'text') && (
         <div className="flex-1 min-h-0">
           <CodeEditor
             value={request.body}
@@ -303,7 +337,10 @@ function BodyEditor() {
             }
           />
         </div>
-      ) : (
+      )}
+
+      {/* None */}
+      {request.bodyType === 'none' && (
         <div className="flex items-center justify-center flex-1 text-xs text-gh-fg-subtle">
           No body for this request
         </div>

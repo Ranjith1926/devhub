@@ -22,8 +22,11 @@ pub struct HttpRequestConfig {
     /// Flat list of [key, value] pairs appended as query-string.
     pub params: Vec<[String; 2]>,
     pub body: Option<String>,
-    /// "none" | "json" | "text"
+    /// "none" | "json" | "text" | "form"
     pub body_type: String,
+    /// Form-data fields sent when body_type == "form".
+    #[serde(default)]
+    pub form_fields: Vec<[String; 2]>,
 }
 
 /// Response data sent back to the frontend.
@@ -101,6 +104,15 @@ pub async fn make_http_request(config: HttpRequestConfig) -> Result<HttpResponse
             }
             _ => {}
         }
+    }
+
+    // Multipart form-data
+    if config.body_type == "form" && !config.form_fields.is_empty() {
+        let mut form = reqwest::multipart::Form::new();
+        for field in &config.form_fields {
+            form = form.text(field[0].clone(), field[1].clone());
+        }
+        req_builder = req_builder.multipart(form);
     }
 
     let start = Instant::now();
