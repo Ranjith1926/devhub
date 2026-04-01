@@ -15,10 +15,13 @@ import {
   Upload,
   ChevronLeft,
   ChevronRight,
-  LogIn,
+  LogOut,
 } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 import { Tooltip } from '../ui/Tooltip';
 import { useAppStore } from '../../store/appStore';
+import { useAuthStore } from '../../store/authStore';
 import { TabType } from '../../types';
 
 interface NavItem {
@@ -64,6 +67,12 @@ interface SidebarProps {
 export function Sidebar({ onExport, onImport, onSettings }: SidebarProps) {
   const { tabs, activeTabId, openFeature, sidebarCollapsed, toggleSidebar } =
     useAppStore();
+  const { user, signout } = useAuthStore();
+
+  async function handleSignOut() {
+    await signOut(auth);
+    signout();
+  }
 
   const activeType = tabs.find((t) => t.id === activeTabId)?.type;
 
@@ -152,18 +161,29 @@ export function Sidebar({ onExport, onImport, onSettings }: SidebarProps) {
           </button>
         </Tooltip>
 
-        <Tooltip content="Login  —  Coming Soon" position="right">
-          <button
-            disabled
-            aria-label="Login (Coming Soon)"
-            className="relative flex items-center justify-center w-10 h-10 rounded-lg text-gh-fg-subtle/40 cursor-not-allowed"
-          >
-            <LogIn size={16} />
-            <span className="absolute -top-0.5 -right-0.5 text-[8px] font-semibold leading-none bg-gh-accent text-white rounded px-0.5 py-px">
-              Soon
-            </span>
-          </button>
-        </Tooltip>
+        {user && (
+          <>
+            <Tooltip content={`Signed in as ${user.displayName ?? user.email}`} position="right">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg cursor-default">
+                <div className="w-7 h-7 rounded-full bg-gh-accent/20 border border-gh-accent/40 flex items-center justify-center">
+                  <span className="text-[11px] font-semibold text-gh-accent leading-none uppercase">
+                    {(user.displayName ?? user.email ?? '?').charAt(0)}
+                  </span>
+                </div>
+              </div>
+            </Tooltip>
+
+            <Tooltip content="Sign out" position="right">
+              <button
+                onClick={handleSignOut}
+                aria-label="Sign out"
+                className="flex items-center justify-center w-10 h-10 rounded-lg text-gh-fg-subtle hover:text-gh-danger hover:bg-gh-danger/10 transition-colors"
+              >
+                <LogOut size={16} />
+              </button>
+            </Tooltip>
+          </>
+        )}
       </div>
     </aside>
   );
