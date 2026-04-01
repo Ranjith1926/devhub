@@ -29,7 +29,13 @@
           "$APPDATA/**",
           "$DOWNLOAD/**",
           "$DOCUMENT/**",
-          "$DESKTOP/**"
+          "$DESKTOP/**",
+          "$HOME/**",
+          "$PICTURE/**",
+          "$PUBLIC/**",
+          "$TEMP/**",
+          "$CONFIG/**",
+          "$DATA/**"
         ]
       },
       "path": {

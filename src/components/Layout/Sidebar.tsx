@@ -161,6 +161,13 @@ export function Sidebar({ onExport, onImport, onSettings }: SidebarProps) {
           </button>
         </Tooltip>
 
+        {/* Copyright */}
+        <Tooltip content="© 2026 Ranjith Kumar" position="right">
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg cursor-default">
+            <span className="text-base text-gh-fg-subtle leading-none text-center select-none">©</span>
+          </div>
+        </Tooltip>
+
         {user && (
           <>
             <Tooltip content={`Signed in as ${user.displayName ?? user.email}`} position="right">

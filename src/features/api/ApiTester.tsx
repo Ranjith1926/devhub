@@ -7,7 +7,7 @@
 
 import React, { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
-import { FolderOpen, History, Trash2 } from 'lucide-react';
+import { FolderOpen, History, Trash2, RotateCcw } from 'lucide-react';
 import { RequestBuilder } from './RequestBuilder';
 import { ResponseViewer } from './ResponseViewer';
 import { Collections } from './Collections';
@@ -42,15 +42,14 @@ function HistoryPanel() {
         <span className="text-xs font-semibold text-gh-fg-muted uppercase tracking-wider">
           History
         </span>
-        {history.length > 0 && (
-          <Button
-            variant="ghost"
-            size="xs"
-            icon={<Trash2 size={10} />}
-            onClick={handleClear}
-            title="Clear history"
-          />
-        )}
+        <Button
+          variant="ghost"
+          size="xs"
+          icon={<Trash2 size={10} />}
+          onClick={handleClear}
+          title="Clear history"
+          disabled={history.length === 0}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -98,9 +97,19 @@ export function ApiTester() {
     collectionsOpen,
     toggleCollections,
     prependHistory,
+    history,
+    setHistory,
+    resetRequest,
   } = useApiStore();
   const toast = useToast();
   const [historyOpen, setHistoryOpen] = React.useState(false);
+
+  // Load history from DB on mount (always refresh to reflect imports)
+  React.useEffect(() => {
+    invoke<any[]>('get_request_history')
+      .then((h) => setHistory(h))
+      .catch(() => {});
+  }, []);
 
   const sendRequest = useCallback(async () => {
     if (!request.url.trim()) {
@@ -200,6 +209,16 @@ export function ApiTester() {
             title="Toggle history"
           >
             History
+          </Button>
+          <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="xs"
+            icon={<RotateCcw size={13} />}
+            onClick={() => { resetRequest(); setResponse(null); }}
+            title="Reset request"
+          >
+            Reset
           </Button>
         </div>
 
