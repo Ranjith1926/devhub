@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+dist/
+dist-ssr/
+
+# Cloned subfolder (local only)
+devhub/
+
+# Tauri build output
+src-tauri/target/
+
+# Rust
+**/*.rs.bk
+# Note: Cargo.lock is intentionally committed for binary applications
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript build info
+*.tsbuildinfo

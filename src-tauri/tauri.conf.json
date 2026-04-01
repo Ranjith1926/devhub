@@ -1,0 +1,75 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
+    "withGlobalTauri": false
+  },
+  "package": {
+    "productName": "DevHub",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "dialog": {
+        "all": true
+      },
+      "fs": {
+        "all": true,
+        "scope": [
+          "$APPDATA/**",
+          "$DOWNLOAD/**",
+          "$DOCUMENT/**",
+          "$DESKTOP/**"
+        ]
+      },
+      "path": {
+        "all": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.devhub.app",
+      "icon": [
+        "icons/icon-32x32.png",
+        "icons/icon-128x128.png",
+        "icons/icon-256x256.png",
+        "icons/icon.ico"
+      ],
+      "resources": [],
+      "externalBin": [],
+      "copyright": "© 2026 DevHub",
+      "category": "DeveloperTool",
+      "shortDescription": "Developer Productivity Hub",
+      "longDescription": "All-in-one developer tool: API tester, JSON tools, snippet manager, and database explorer."
+    },
+    "security": {
+      "csp": null
+    },
+    "updater": {
+      "active": false
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "DevHub",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 620,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "center": true,
+        "focus": true
+      }
+    ]
+  }
+}

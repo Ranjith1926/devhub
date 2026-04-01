@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+html.theme-dark {
+  --gh-canvas: 13 17 23;
+  --gh-overlay: 22 27 34;
+  --gh-inset: 1 4 9;
+  --gh-subtle: 33 38 45;
+  --gh-border: 48 54 61;
+  --gh-border-muted: 33 38 45;
+  --gh-fg: 230 237 243;
+  --gh-fg-muted: 139 148 158;
+  --gh-fg-subtle: 110 118 129;
+  --gh-accent: 88 166 255;
+  --gh-success: 63 185 80;
+  --gh-attention: 210 153 34;
+  --gh-danger: 248 81 73;
+  --gh-done: 188 140 255;
+  --gh-sponsors: 219 97 162;
+}
+
+html.theme-light {
+  --gh-canvas: 246 248 250;
+  --gh-overlay: 255 255 255;
+  --gh-inset: 234 238 242;
+  --gh-subtle: 234 238 242;
+  --gh-border: 208 215 222;
+  --gh-border-muted: 216 222 228;
+  --gh-fg: 31 35 40;
+  --gh-fg-muted: 87 96 106;
+  --gh-fg-subtle: 101 109 118;
+  --gh-accent: 9 105 218;
+  --gh-success: 31 136 61;
+  --gh-attention: 154 103 0;
+  --gh-danger: 207 34 46;
+  --gh-done: 130 80 223;
+  --gh-sponsors: 191 57 137;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: rgb(var(--gh-canvas));
+  color: rgb(var(--gh-fg));
+  -webkit-font-smoothing: antialiased;
+}
