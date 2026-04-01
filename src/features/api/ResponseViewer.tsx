@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Copy, Download, Clock, HardDrive } from 'lucide-react';
+import { Copy, Download, Clock, HardDrive, CheckCircle2, XCircle, FlaskConical } from 'lucide-react';
 import { CodeEditor, detectLanguage } from '../../components/ui/CodeEditor';
 import { Button } from '../../components/ui/Button';
 import { useApiStore } from '../../store/apiStore';
@@ -43,10 +43,10 @@ function prettyJson(raw: string): string {
 // Component
 // ---------------------------------------------------------------------------
 
-type ResponseTab = 'body' | 'headers';
+type ResponseTab = 'body' | 'headers' | 'tests';
 
 export function ResponseViewer() {
-  const { response, loading } = useApiStore();
+  const { response, loading, assertionResults, assertions } = useApiStore();
   const toast = useToast();
   const [tab, setTab] = useState<ResponseTab>('body');
   const [pretty, setPretty] = useState(true);
@@ -77,6 +77,12 @@ export function ResponseViewer() {
       toast.error(String(e));
     }
   };
+
+  // Determine syntax language from Content-Type header
+  const passCount = assertionResults.filter((r) => r.passed).length;
+  const failCount = assertionResults.filter((r) => !r.passed).length;
+  const enabledAssertions = assertions.filter((a) => a.enabled);
+  const hasResults = assertionResults.length > 0;
 
   // Determine syntax language from Content-Type header
   const contentType = response?.headers?.['content-type'] ?? '';
@@ -134,7 +140,7 @@ export function ResponseViewer() {
 
       {/* Tab bar */}
       <div className="flex border-b border-gh-border shrink-0 px-3">
-        {(['body', 'headers'] as ResponseTab[]).map((t) => (
+        {(['body', 'headers', 'tests'] as ResponseTab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -149,6 +155,16 @@ export function ResponseViewer() {
             {t === 'headers' && (
               <span className="ml-1 text-[10px] text-gh-fg-subtle">
                 ({Object.keys(response.headers).length})
+              </span>
+            )}
+            {t === 'tests' && hasResults && (
+              <span
+                className={[
+                  'ml-1 text-[10px] font-semibold',
+                  failCount > 0 ? 'text-gh-danger' : 'text-gh-success',
+                ].join(' ')}
+              >
+                {passCount}/{enabledAssertions.length}
               </span>
             )}
           </button>
@@ -180,6 +196,54 @@ export function ResponseViewer() {
             height="100%"
             className="rounded-none border-none"
           />
+        ) : tab === 'tests' ? (
+          <div className="overflow-auto h-full p-3">
+            {assertionResults.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 gap-2 text-gh-fg-subtle">
+                <FlaskConical size={24} className="opacity-30" />
+                <p className="text-xs">No test results yet. Send a request to run assertions.</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {assertionResults.map((result) => {
+                  const assertion = assertions.find((a) => a.id === result.assertionId);
+                  return (
+                    <div
+                      key={result.assertionId}
+                      className={[
+                        'flex items-start gap-2 rounded p-2 text-xs border',
+                        result.passed
+                          ? 'bg-gh-success/5 border-gh-success/20'
+                          : 'bg-gh-danger/5 border-gh-danger/20',
+                      ].join(' ')}
+                    >
+                      {result.passed ? (
+                        <CheckCircle2 size={13} className="text-gh-success mt-0.5 shrink-0" />
+                      ) : (
+                        <XCircle size={13} className="text-gh-danger mt-0.5 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gh-fg">{result.message}</p>
+                        {!result.passed && result.actual && (
+                          <p className="text-gh-fg-muted mt-0.5">
+                            Actual:{' '}
+                            <span className="font-mono text-gh-attention">{result.actual}</span>
+                          </p>
+                        )}
+                        {assertion && (
+                          <p className="text-gh-fg-subtle mt-0.5 font-mono">
+                            {assertion.target}{assertion.targetArg ? `.${assertion.targetArg}` : ''}{' '}
+                            <span className="text-gh-fg-muted">{assertion.operator}</span>{' '}
+                            {assertion.expected}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="overflow-auto h-full p-2">
             <table className="w-full text-xs">

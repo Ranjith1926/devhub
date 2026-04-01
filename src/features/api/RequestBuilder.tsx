@@ -5,13 +5,143 @@
  */
 
 import React from 'react';
-import { Plus, Trash2, Send, ShieldCheck } from 'lucide-react';
+import { Plus, Trash2, Send, ShieldCheck, FlaskConical } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { CodeEditor } from '../../components/ui/CodeEditor';
 import { useApiStore, AuthType } from '../../store/apiStore';
-import { BodyType, HttpMethod, KeyValuePair } from '../../types';
+import { useEnvStore } from '../../store/envStore';
+import { interpolate, extractVariableNames } from '../../lib/interpolate';
+import { BodyType, HttpMethod, KeyValuePair, Assertion, AssertionTarget, AssertionOperator } from '../../types';
+
+// ---------------------------------------------------------------------------
+// Tests (assertions) editor
+// ---------------------------------------------------------------------------
+
+const TARGET_OPTIONS: { value: AssertionTarget; label: string }[] = [
+  { value: 'status',        label: 'Status Code' },
+  { value: 'response_time', label: 'Response Time (ms)' },
+  { value: 'body',          label: 'Body (text)' },
+  { value: 'body_json',     label: 'Body JSON path' },
+  { value: 'header',        label: 'Header' },
+  { value: 'status_text',   label: 'Status Text' },
+];
+
+const OPERATOR_OPTIONS: { value: AssertionOperator; label: string; numeric?: boolean }[] = [
+  { value: 'eq',           label: '== equals' },
+  { value: 'ne',           label: '!= not equals' },
+  { value: 'gt',           label: '> greater than',    numeric: true },
+  { value: 'gte',          label: '>= greater or equal', numeric: true },
+  { value: 'lt',           label: '< less than',       numeric: true },
+  { value: 'lte',          label: '<= less or equal',  numeric: true },
+  { value: 'contains',     label: 'contains' },
+  { value: 'not_contains', label: 'does not contain' },
+  { value: 'matches',      label: 'matches regex' },
+  { value: 'exists',       label: 'exists' },
+  { value: 'not_exists',   label: 'does not exist' },
+];
+
+const NO_EXPECTED: AssertionOperator[] = ['exists', 'not_exists'];
+
+function TestsEditor() {
+  const { assertions, setAssertions } = useApiStore();
+
+  const add = () =>
+    setAssertions([
+      ...assertions,
+      { id: uuidv4(), enabled: true, target: 'status', targetArg: '', operator: 'eq', expected: '200' },
+    ]);
+
+  const update = (id: string, patch: Partial<Assertion>) =>
+    setAssertions(assertions.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+
+  const remove = (id: string) => setAssertions(assertions.filter((a) => a.id !== id));
+
+  const selectCls = 'h-7 px-1.5 rounded border border-gh-border bg-gh-overlay text-xs text-gh-fg focus:outline-none focus:border-gh-accent';
+
+  return (
+    <div className="flex flex-col h-full gap-2">
+      {assertions.length === 0 ? (
+        <div className="flex flex-col items-center justify-center flex-1 gap-2 text-center py-6">
+          <FlaskConical size={24} className="text-gh-fg-subtle opacity-40" />
+          <p className="text-xs text-gh-fg-subtle">
+            No tests yet. Add an assertion to validate the response.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto">
+          {assertions.map((a) => (
+            <div key={a.id} className="flex items-center gap-1.5 group">
+              {/* Enable */}
+              <input
+                type="checkbox"
+                checked={a.enabled}
+                onChange={(e) => update(a.id, { enabled: e.target.checked })}
+                className="w-3.5 h-3.5 accent-gh-accent shrink-0"
+              />
+
+              {/* Target */}
+              <select
+                value={a.target}
+                onChange={(e) => update(a.id, { target: e.target.value as AssertionTarget, targetArg: '' })}
+                className={selectCls}
+              >
+                {TARGET_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+
+              {/* targetArg — header name or JSON path */}
+              {(a.target === 'header' || a.target === 'body_json') && (
+                <input
+                  value={a.targetArg}
+                  onChange={(e) => update(a.id, { targetArg: e.target.value })}
+                  placeholder={a.target === 'header' ? 'content-type' : 'data.id'}
+                  className="w-24 h-7 px-1.5 rounded border border-gh-border bg-gh-overlay text-xs font-mono text-gh-fg placeholder:text-gh-fg-subtle focus:outline-none focus:border-gh-accent"
+                />
+              )}
+
+              {/* Operator */}
+              <select
+                value={a.operator}
+                onChange={(e) => update(a.id, { operator: e.target.value as AssertionOperator })}
+                className={selectCls}
+              >
+                {OPERATOR_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+
+              {/* Expected value */}
+              {!NO_EXPECTED.includes(a.operator) && (
+                <input
+                  value={a.expected}
+                  onChange={(e) => update(a.id, { expected: e.target.value })}
+                  placeholder="expected"
+                  className="flex-1 h-7 px-1.5 rounded border border-gh-border bg-gh-overlay text-xs font-mono text-gh-fg placeholder:text-gh-fg-subtle focus:outline-none focus:border-gh-accent min-w-0"
+                />
+              )}
+
+              {/* Delete */}
+              <button
+                onClick={() => remove(a.id)}
+                className="text-gh-fg-subtle hover:text-gh-danger opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="shrink-0">
+        <Button variant="ghost" size="xs" icon={<Plus size={11} />} onClick={add}>
+          Add assertion
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // HTTP method selector
@@ -353,7 +483,7 @@ function BodyEditor() {
 // Main component
 // ---------------------------------------------------------------------------
 
-const REQUEST_TABS = ['Params', 'Headers', 'Body', 'Auth'] as const;
+const REQUEST_TABS = ['Params', 'Headers', 'Body', 'Auth', 'Tests'] as const;
 type RequestTab = (typeof REQUEST_TABS)[number];
 
 interface RequestBuilderProps {
@@ -366,14 +496,25 @@ export function RequestBuilder({ onSend }: RequestBuilderProps) {
     setUrl,
     setHeaders,
     setParams,
+    assertions,
     activeRequestTab,
     setActiveRequestTab,
     loading,
   } = useApiStore();
+  const { activeEnv } = useEnvStore();
+  const env = activeEnv();
 
   const activeParams = request.params.filter((p) => p.enabled && p.key).length;
   const activeHeaders = request.headers.filter((h) => h.enabled && h.key).length;
   const authActive = request.auth.type !== 'none';
+  const activeAssertions = assertions.filter((a) => a.enabled).length;
+
+  // Compute resolved URL for preview
+  const urlVars = extractVariableNames(request.url);
+  const hasVars = urlVars.length > 0;
+  const { result: resolvedUrl, unresolved } = interpolate(request.url, env);
+  const showResolvedUrl = hasVars && resolvedUrl !== request.url;
+  const hasUnresolved = unresolved.length > 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -384,7 +525,7 @@ export function RequestBuilder({ onSend }: RequestBuilderProps) {
           value={request.url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && onSend()}
-          placeholder="https://api.example.com/endpoint"
+          placeholder="https://api.example.com/endpoint  or  {{baseUrl}}/endpoint"
           className="flex-1 h-9 px-3 border border-gh-border bg-gh-overlay text-sm text-gh-fg placeholder:text-gh-fg-subtle focus:outline-none focus:border-gh-accent font-mono"
           spellCheck={false}
         />
@@ -401,6 +542,24 @@ export function RequestBuilder({ onSend }: RequestBuilderProps) {
         </Button>
       </div>
 
+      {/* Resolved URL preview */}
+      {showResolvedUrl && (
+        <div className={[
+          'mx-3 mb-1.5 px-2.5 py-1 rounded text-[11px] font-mono truncate',
+          hasUnresolved
+            ? 'bg-amber-400/10 border border-amber-400/30 text-amber-400'
+            : 'bg-gh-success/10 border border-gh-success/30 text-gh-success',
+        ].join(' ')}>
+          <span className="text-gh-fg-subtle mr-1.5">→</span>
+          {resolvedUrl}
+          {hasUnresolved && (
+            <span className="ml-2 font-sans text-amber-400/80">
+              (unresolved: {unresolved.join(', ')})
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Tab bar */}
       <div className="flex border-b border-gh-border shrink-0 px-3">
         {REQUEST_TABS.map((tab) => {
@@ -412,7 +571,7 @@ export function RequestBuilder({ onSend }: RequestBuilderProps) {
           return (
             <button
               key={tab}
-              onClick={() => setActiveRequestTab(tab.toLowerCase() as 'params' | 'headers' | 'body' | 'auth')}
+              onClick={() => setActiveRequestTab(tab.toLowerCase() as 'params' | 'headers' | 'body' | 'auth' | 'tests')}
               className={[
                 'px-3 py-1.5 text-xs border-b-2 transition-colors',
                 active
@@ -426,6 +585,16 @@ export function RequestBuilder({ onSend }: RequestBuilderProps) {
                   Auth
                   {authActive && (
                     <span className="w-1.5 h-1.5 rounded-full bg-gh-success inline-block" />
+                  )}
+                </span>
+              ) : tab === 'Tests' ? (
+                <span className="flex items-center gap-1">
+                  <FlaskConical size={11} className={activeAssertions > 0 ? 'text-gh-accent' : ''} />
+                  Tests
+                  {activeAssertions > 0 && (
+                    <span className="ml-0.5 px-1 py-0.5 rounded-full bg-gh-accent/15 text-gh-accent text-[10px] leading-none">
+                      {activeAssertions}
+                    </span>
                   )}
                 </span>
               ) : tab}
@@ -459,6 +628,7 @@ export function RequestBuilder({ onSend }: RequestBuilderProps) {
         )}
         {activeRequestTab === 'body' && <BodyEditor />}
         {activeRequestTab === 'auth' && <AuthEditor />}
+        {activeRequestTab === 'tests' && <TestsEditor />}
       </div>
     </div>
   );

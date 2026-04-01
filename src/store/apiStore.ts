@@ -12,6 +12,8 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   ApiCollection,
   ApiResponse,
+  Assertion,
+  AssertionResult,
   BodyType,
   HistoryEntry,
   HttpMethod,
@@ -109,8 +111,14 @@ interface ApiState {
   // UI state
   collectionsOpen: boolean;
   toggleCollections: () => void;
-  activeRequestTab: 'params' | 'headers' | 'body' | 'auth';
-  setActiveRequestTab: (t: 'params' | 'headers' | 'body' | 'auth') => void;
+  activeRequestTab: 'params' | 'headers' | 'body' | 'auth' | 'tests';
+  setActiveRequestTab: (t: 'params' | 'headers' | 'body' | 'auth' | 'tests') => void;
+
+  // Assertions
+  assertions: Assertion[];
+  setAssertions: (a: Assertion[]) => void;
+  assertionResults: AssertionResult[];
+  setAssertionResults: (r: AssertionResult[]) => void;
 }
 
 export const useApiStore = create<ApiState>((set, get) => ({
@@ -185,6 +193,12 @@ export const useApiStore = create<ApiState>((set, get) => ({
   toggleCollections: () => set((s) => ({ collectionsOpen: !s.collectionsOpen })),
   activeRequestTab: 'params',
   setActiveRequestTab: (activeRequestTab) => set({ activeRequestTab }),
+
+  // ---- assertions ----
+  assertions: [],
+  setAssertions: (assertions) => set({ assertions }),
+  assertionResults: [],
+  setAssertionResults: (assertionResults) => set({ assertionResults }),
 }));
 
 // ---------------------------------------------------------------------------

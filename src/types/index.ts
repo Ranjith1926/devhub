@@ -130,10 +130,69 @@ export interface QueryResult {
 }
 
 // ---------------------------------------------------------------------------
+// Request Assertions (Tests)
+// ---------------------------------------------------------------------------
+
+export type AssertionTarget =
+  | 'status'          // HTTP status code  (number)
+  | 'status_text'     // e.g. "OK"
+  | 'response_time'   // ms
+  | 'body'            // full body string
+  | 'body_json'       // JSONPath-style: body.user.id
+  | 'header';         // specific response header value
+
+export type AssertionOperator =
+  | 'eq'     // ==
+  | 'ne'     // !=
+  | 'gt'     // >
+  | 'gte'    // >=
+  | 'lt'     // <
+  | 'lte'    // <=
+  | 'contains'
+  | 'not_contains'
+  | 'exists'
+  | 'not_exists'
+  | 'matches'; // regex
+
+export interface Assertion {
+  id: string;
+  enabled: boolean;
+  target: AssertionTarget;
+  /** For target=header: the header name. For body_json: dot-path like "data.user.id" */
+  targetArg: string;
+  operator: AssertionOperator;
+  expected: string;
+}
+
+export interface AssertionResult {
+  assertionId: string;
+  passed: boolean;
+  message: string;
+  actual: string;
+}
+
+// ---------------------------------------------------------------------------
+// Environments
+// ---------------------------------------------------------------------------
+
+export interface EnvVariable {
+  id: string;
+  key: string;
+  value: string;
+  enabled: boolean;
+}
+
+export interface Environment {
+  id: string;
+  name: string;
+  variables: EnvVariable[];
+}
+
+// ---------------------------------------------------------------------------
 // Application tabs
 // ---------------------------------------------------------------------------
 
-export type TabType = 'api-tester' | 'json-tools' | 'snippets' | 'database';
+export type TabType = 'api-tester' | 'json-tools' | 'snippets' | 'database' | 'regex-tester' | 'encoder';
 
 export interface AppTab {
   id: string;
