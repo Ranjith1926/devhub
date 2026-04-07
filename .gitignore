@@ -18,6 +18,10 @@ src-tauri/target/
 .env.local
 .env.production
 
+# Generated licensing artifacts (keep private/out of VCS)
+keys/
+licenses/
+
 # Editor
 .vscode/settings.json
 .idea/
