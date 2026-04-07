@@ -12,6 +12,8 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   ApiCollection,
   ApiResponse,
+  Assertion,
+  AssertionResult,
   BodyType,
   HistoryEntry,
   HttpMethod,
@@ -59,38 +61,48 @@ interface ActiveRequest {
   auth: AuthConfig;
 }
 
-const DEFAULT_REQUEST: ActiveRequest = {
-  method: 'GET',
-  url: '',
-  headers: [{ id: uuidv4(), key: '', value: '', enabled: true }],
-  params: [{ id: uuidv4(), key: '', value: '', enabled: true }],
-  body: '{\n  \n}',
-  bodyType: 'none',
-  auth: { ...DEFAULT_AUTH },
-};
+function createEmptyRow(): KeyValuePair {
+  return { id: uuidv4(), key: '', value: '', enabled: true };
+}
+
+function createDefaultRequest(): ActiveRequest {
+  return {
+    method: 'GET',
+    url: '',
+    headers: [createEmptyRow()],
+    params: [createEmptyRow()],
+    body: '{\n  \n}',
+    bodyType: 'none',
+    auth: { ...DEFAULT_AUTH },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Store interface
 // ---------------------------------------------------------------------------
 
 interface ApiState {
-  // Current request editor
-  request: ActiveRequest;
-  setMethod: (m: HttpMethod) => void;
-  setUrl: (url: string) => void;
-  setHeaders: (headers: KeyValuePair[]) => void;
-  setParams: (params: KeyValuePair[]) => void;
-  setBody: (body: string) => void;
-  setBodyType: (t: BodyType) => void;
-  setAuth: (auth: Partial<AuthConfig>) => void;
-  resetRequest: () => void;
-  loadRequest: (req: SavedRequest) => void;
+  // Requests per tab
+  requestsByTabId: Record<string, ActiveRequest>;
+  getRequest: (tabId: string) => ActiveRequest;
+  setMethod: (tabId: string, m: HttpMethod) => void;
+  setUrl: (tabId: string, url: string) => void;
+  setHeaders: (tabId: string, headers: KeyValuePair[]) => void;
+  setParams: (tabId: string, params: KeyValuePair[]) => void;
+  setBody: (tabId: string, body: string) => void;
+  setBodyType: (tabId: string, t: BodyType) => void;
+  setAuth: (tabId: string, auth: Partial<AuthConfig>) => void;
+  resetRequest: (tabId: string) => void;
+  loadRequest: (tabId: string, req: SavedRequest) => void;
+  initRequestForTab: (tabId: string) => void;
 
-  // Response
-  response: ApiResponse | null;
-  loading: boolean;
-  setResponse: (r: ApiResponse | null) => void;
-  setLoading: (v: boolean) => void;
+  // Response per tab
+  responseByTabId: Record<string, ApiResponse | null>;
+  loadingByTabId: Record<string, boolean>;
+  getResponse: (tabId: string) => ApiResponse | null;
+  isLoading: (tabId: string) => boolean;
+  setResponse: (tabId: string, r: ApiResponse | null) => void;
+  setLoading: (tabId: string, v: boolean) => void;
 
   // Collections (loaded from SQLite via Tauri)
   collections: ApiCollection[];
@@ -109,33 +121,81 @@ interface ApiState {
   // UI state
   collectionsOpen: boolean;
   toggleCollections: () => void;
-  activeRequestTab: 'params' | 'headers' | 'body' | 'auth';
-  setActiveRequestTab: (t: 'params' | 'headers' | 'body' | 'auth') => void;
+  activeRequestTab: 'params' | 'headers' | 'body' | 'auth' | 'tests';
+  setActiveRequestTab: (t: 'params' | 'headers' | 'body' | 'auth' | 'tests') => void;
+
+  // Assertions
+  assertions: Assertion[];
+  setAssertions: (a: Assertion[]) => void;
+  assertionResults: AssertionResult[];
+  setAssertionResults: (r: AssertionResult[]) => void;
 }
 
 export const useApiStore = create<ApiState>((set, get) => ({
-  // ---- request ----
-  request: { ...DEFAULT_REQUEST },
-  setMethod: (method) => set((s) => ({ request: { ...s.request, method } })),
-  setUrl: (url) => set((s) => ({ request: { ...s.request, url } })),
-  setHeaders: (headers) => set((s) => ({ request: { ...s.request, headers } })),
-  setParams: (params) => set((s) => ({ request: { ...s.request, params } })),
-  setBody: (body) => set((s) => ({ request: { ...s.request, body } })),
-  setBodyType: (bodyType) => set((s) => ({ request: { ...s.request, bodyType } })),
-  setAuth: (patch) =>
-    set((s) => ({ request: { ...s.request, auth: { ...s.request.auth, ...patch } } })),
-  resetRequest: () =>
-    set({
-      request: {
-        ...DEFAULT_REQUEST,
-        headers: [{ id: uuidv4(), key: '', value: '', enabled: true }],
-        params: [{ id: uuidv4(), key: '', value: '', enabled: true }],
-        auth: { ...DEFAULT_AUTH },
+  // ---- requests per tab ----
+  requestsByTabId: {},
+  getRequest: (tabId) => {
+    const req = get().requestsByTabId[tabId];
+    return req ?? createDefaultRequest();
+  },
+  setMethod: (tabId, method) => set((s) => ({
+    requestsByTabId: {
+      ...s.requestsByTabId,
+      [tabId]: { ...(s.requestsByTabId[tabId] ?? createDefaultRequest()), method },
+    },
+  })),
+  setUrl: (tabId, url) => set((s) => ({
+    requestsByTabId: {
+      ...s.requestsByTabId,
+      [tabId]: { ...(s.requestsByTabId[tabId] ?? createDefaultRequest()), url },
+    },
+  })),
+  setHeaders: (tabId, headers) => set((s) => ({
+    requestsByTabId: {
+      ...s.requestsByTabId,
+      [tabId]: { ...(s.requestsByTabId[tabId] ?? createDefaultRequest()), headers },
+    },
+  })),
+  setParams: (tabId, params) => set((s) => ({
+    requestsByTabId: {
+      ...s.requestsByTabId,
+      [tabId]: { ...(s.requestsByTabId[tabId] ?? createDefaultRequest()), params },
+    },
+  })),
+  setBody: (tabId, body) => set((s) => ({
+    requestsByTabId: {
+      ...s.requestsByTabId,
+      [tabId]: { ...(s.requestsByTabId[tabId] ?? createDefaultRequest()), body },
+    },
+  })),
+  setBodyType: (tabId, bodyType) => set((s) => ({
+    requestsByTabId: {
+      ...s.requestsByTabId,
+      [tabId]: { ...(s.requestsByTabId[tabId] ?? createDefaultRequest()), bodyType },
+    },
+  })),
+  setAuth: (tabId, patch) => set((s) => {
+    const request = s.requestsByTabId[tabId] ?? createDefaultRequest();
+    return {
+      requestsByTabId: {
+        ...s.requestsByTabId,
+        [tabId]: {
+          ...request,
+          auth: { ...request.auth, ...patch },
+        },
       },
-    }),
-  loadRequest: (req) =>
-    set({
-      request: {
+    };
+  }),
+  resetRequest: (tabId) => set((s) => ({
+    requestsByTabId: {
+      ...s.requestsByTabId,
+      [tabId]: createDefaultRequest(),
+    },
+  })),
+  loadRequest: (tabId, req) => set((s) => ({
+    requestsByTabId: {
+      ...s.requestsByTabId,
+      [tabId]: {
         method: req.method,
         url: req.url,
         headers: safeParseKV(req.headers),
@@ -144,13 +204,35 @@ export const useApiStore = create<ApiState>((set, get) => ({
         bodyType: req.body_type,
         auth: { ...DEFAULT_AUTH },
       },
-    }),
+    },
+  })),
+  initRequestForTab: (tabId) => set((s) => {
+    if (s.requestsByTabId[tabId]) return {};
+    return {
+      requestsByTabId: {
+        ...s.requestsByTabId,
+        [tabId]: createDefaultRequest(),
+      },
+    };
+  }),
 
-  // ---- response ----
-  response: null,
-  loading: false,
-  setResponse: (response) => set({ response }),
-  setLoading: (loading) => set({ loading }),
+  // ---- response per tab ----
+  responseByTabId: {},
+  loadingByTabId: {},
+  getResponse: (tabId) => get().responseByTabId[tabId] ?? null,
+  isLoading: (tabId) => get().loadingByTabId[tabId] ?? false,
+  setResponse: (tabId, response) => set((s) => ({
+    responseByTabId: {
+      ...s.responseByTabId,
+      [tabId]: response,
+    },
+  })),
+  setLoading: (tabId, loading) => set((s) => ({
+    loadingByTabId: {
+      ...s.loadingByTabId,
+      [tabId]: loading,
+    },
+  })),
 
   // ---- collections ----
   collections: [],
@@ -185,6 +267,12 @@ export const useApiStore = create<ApiState>((set, get) => ({
   toggleCollections: () => set((s) => ({ collectionsOpen: !s.collectionsOpen })),
   activeRequestTab: 'params',
   setActiveRequestTab: (activeRequestTab) => set({ activeRequestTab }),
+
+  // ---- assertions ----
+  assertions: [],
+  setAssertions: (assertions) => set({ assertions }),
+  assertionResults: [],
+  setAssertionResults: (assertionResults) => set({ assertionResults }),
 }));
 
 // ---------------------------------------------------------------------------

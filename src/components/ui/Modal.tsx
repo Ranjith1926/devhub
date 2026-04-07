@@ -14,6 +14,8 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   width?: string;
+  /** Remove default padding and overflow-y-auto so children can control their own layout */
+  noPadding?: boolean;
 }
 
 export function Modal({
@@ -23,6 +25,7 @@ export function Modal({
   children,
   footer,
   width = 'max-w-lg',
+  noPadding = false,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -76,8 +79,8 @@ export function Modal({
           </div>
         )}
 
-        {/* Content — scrollable */}
-        <div className="flex-1 overflow-y-auto p-4">{children}</div>
+        {/* Content */}
+        <div className={noPadding ? 'flex-1 overflow-hidden flex flex-col min-h-0' : 'flex-1 overflow-y-auto p-4 no-scrollbar'}>{children}</div>
 
         {/* Footer */}
         {footer && (

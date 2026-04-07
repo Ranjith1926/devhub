@@ -25,14 +25,18 @@ const DEFAULT_TAB_TITLES: Record<TabType, string> = {
   'json-tools': 'JSON Tools',
   snippets: 'Snippets',
   database: 'Database',
+  'regex-tester': 'Regex Tester',
+  'encoder': 'Encoder',
 };
 
-/** Four permanent tabs — one per feature — shown on first launch. */
+/** Six permanent tabs — one per feature — shown on first launch. */
 const INITIAL_TABS: AppTab[] = [
   { id: 'tab-api', type: 'api-tester', title: 'API Tester' },
   { id: 'tab-json', type: 'json-tools', title: 'JSON Tools' },
   { id: 'tab-snippets', type: 'snippets', title: 'Snippets' },
   { id: 'tab-database', type: 'database', title: 'Database' },
+  { id: 'tab-regex', type: 'regex-tester', title: 'Regex Tester' },
+  { id: 'tab-encoder', type: 'encoder', title: 'Encoder' },
 ];
 
 export const useAppStore = create<AppState>((set, get) => ({

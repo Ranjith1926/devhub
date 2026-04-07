@@ -1,8 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { invoke } from '@tauri-apps/api/tauri';
-import { save, open as openDialog } from '@tauri-apps/api/dialog';
-import { writeTextFile, readTextFile } from '@tauri-apps/api/fs';
 import { Sidebar } from './components/Layout/Sidebar';
 import { TabBar } from './components/Layout/TabBar';
 import { TitleBar } from './components/Layout/TitleBar';
@@ -10,7 +8,10 @@ import { ApiTester } from './features/api';
 import { JsonTools } from './features/json-tools/JsonTools';
 import { Snippets } from './features/snippets/Snippets';
 import { Database } from './features/database/Database';
+import { RegexTester } from './features/regex-tester/RegexTester';
+import { EncoderTool } from './features/encoder/EncoderTool';
 import { AuthPage } from './features/auth/AuthPage';
+import { ExportImportModal } from './features/settings/ExportImportModal';
 import { Modal } from './components/ui/Modal';
 import { useAppStore } from './store/appStore';
 import { useSnippetStore } from './store/snippetStore';
@@ -21,7 +22,7 @@ import { useToast } from './hooks/useToast';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './lib/firebase';
 import {
-  Send, Braces, Bookmark, Database as DbIcon,
+  Send, Braces, Bookmark, Database as DbIcon, Regex, ShieldCheck,
   Keyboard, Info, Moon, Sun,
 } from 'lucide-react';
 
@@ -34,7 +35,9 @@ const SHORTCUTS = [
   { keys: 'Ctrl+2', desc: 'Open JSON Tools' },
   { keys: 'Ctrl+3', desc: 'Open Snippets' },
   { keys: 'Ctrl+4', desc: 'Open Database' },
-  { keys: 'Ctrl+Shift+E', desc: 'Export data' },
+  { keys: 'Ctrl+5', desc: 'Open Regex Tester' },
+  { keys: 'Ctrl+6', desc: 'Open Encoder / Hash' },
+  { keys: 'Ctrl+Shift+E', desc: 'Export / Import' },
   { keys: 'Ctrl+Shift+I', desc: 'Import data' },
   { keys: 'Escape', desc: 'Close dialog / modal' },
 ];
@@ -134,6 +137,8 @@ function SettingsModal({
             { icon: <Braces size={14} />, label: 'JSON Tools', desc: 'Format, validate & generate TS types' },
             { icon: <Bookmark size={14} />, label: 'Snippets', desc: 'Save & search reusable code snippets' },
             { icon: <DbIcon size={14} />, label: 'Database', desc: 'Connect to MySQL & MongoDB' },
+            { icon: <Regex size={14} />, label: 'Regex Tester', desc: 'Test & debug regular expressions' },
+            { icon: <ShieldCheck size={14} />, label: 'Encoder / Hash', desc: 'Base64, SHA hashes, URL & HTML encoding' },
           ].map(({ icon, label, desc }) => (
             <div key={label} className="flex flex-col gap-1 p-3 rounded-md bg-gh-subtle border border-gh-border">
               <div className="flex items-center gap-2 text-gh-accent">{icon}<span className="text-xs font-semibold text-gh-fg">{label}</span></div>
@@ -166,10 +171,10 @@ function SettingsModal({
 
 export default function App() {
   const { tabs, activeTabId, openFeature } = useAppStore();
-  const { setSnippets } = useSnippetStore();
-  const { setCollections, setHistory } = useApiStore();
   const { user, setUser } = useAuthStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exportImportOpen, setExportImportOpen] = useState(false);
+  const [exportImportTab, setExportImportTab] = useState<'export' | 'import'>('export');
   const [authReady, setAuthReady] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem('devhub-theme');
@@ -202,72 +207,16 @@ export default function App() {
   }, [theme]);
 
   // ---- Export ----
-  const handleExport = useCallback(async () => {
-    try {
-      const json = await invoke<string>('export_data');
-      const path = await save({
-        defaultPath: `devhub-export-${new Date().toISOString().slice(0, 10)}.json`,
-        filters: [{ name: 'JSON', extensions: ['json'] }],
-      });
-      if (!path) return;
-      await writeTextFile(path, json);
-      toast.success('Data exported successfully');
-    } catch (e) {
-      console.error('[DevHub] Export error:', e);
-      toast.error(`Export failed: ${e}`);
-    }
+  const handleExport = useCallback(() => {
+    setExportImportTab('export');
+    setExportImportOpen(true);
   }, []);
 
   // ---- Import ----
-  const handleImport = useCallback(async () => {
-    try {
-      const path = await openDialog({
-        multiple: false,
-        filters: [{ name: 'JSON', extensions: ['json'] }],
-      });
-      if (!path || Array.isArray(path)) return;
-      const json = await readTextFile(path as string);
-
-      // Validate the file is a DevHub export before sending to the backend
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(json);
-      } catch {
-        toast.error('Import failed: file is not valid JSON');
-        return;
-      }
-      const p = parsed as Record<string, unknown>;
-      if (!p.version || !Array.isArray(p.collections) || !Array.isArray(p.snippets)) {
-        toast.error('Import failed: this file is not a valid DevHub export. Use the Export button to generate one first.');
-        return;
-      }
-
-      const msg = await invoke<string>('import_data', { json });
-
-      // Reload snippets
-      const snippets = await invoke<any[]>('get_snippets');
-      setSnippets(snippets);
-
-      // Reload collections with their requests
-      const rawCollections = await invoke<any[]>('get_collections');
-      const fullCollections = await Promise.all(
-        rawCollections.map(async (c) => {
-          const requests = await invoke<any[]>('get_requests', { collectionId: c.id });
-          return { ...c, requests };
-        }),
-      );
-      setCollections(fullCollections);
-
-      // Reload history
-      const history = await invoke<any[]>('get_request_history');
-      setHistory(history);
-
-      toast.success(msg);
-    } catch (e) {
-      console.error('[DevHub] Import error:', e);
-      toast.error(`Import failed: ${e}`);
-    }
-  }, [setCollections, setHistory, setSnippets]);
+  const handleImport = useCallback(() => {
+    setExportImportTab('import');
+    setExportImportOpen(true);
+  }, []);
 
   // Global keyboard shortcuts
   useKeyboardShortcuts([
@@ -275,6 +224,8 @@ export default function App() {
     { ctrl: true, key: '2', handler: () => openFeature('json-tools'), description: 'Open JSON Tools' },
     { ctrl: true, key: '3', handler: () => openFeature('snippets'), description: 'Open Snippets' },
     { ctrl: true, key: '4', handler: () => openFeature('database'), description: 'Open Database' },
+    { ctrl: true, key: '5', handler: () => openFeature('regex-tester'), description: 'Open Regex Tester' },
+    { ctrl: true, key: '6', handler: () => openFeature('encoder'), description: 'Open Encoder' },
     { ctrl: true, shift: true, key: 'E', handler: handleExport, description: 'Export data' },
     { ctrl: true, shift: true, key: 'I', handler: handleImport, description: 'Import data' },
   ]);
@@ -292,20 +243,31 @@ export default function App() {
 
   // Show auth page when no user is logged in
   if (!user) {
-    return <AuthPage />;
+    return (
+      <div className="flex flex-col h-screen w-screen overflow-hidden bg-gh-canvas text-gh-fg font-sans">
+        <TitleBar />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <AuthPage />
+        </div>
+      </div>
+    );
   }
 
   function renderPanel() {
     if (!activeTab) return null;
     switch (activeTab.type) {
       case 'api-tester':
-        return <ApiTester />;
+        return <ApiTester key={activeTab.id} tabId={activeTab.id} />;
       case 'json-tools':
         return <JsonTools />;
       case 'snippets':
         return <Snippets />;
       case 'database':
         return <Database />;
+      case 'regex-tester':
+        return <RegexTester />;
+      case 'encoder':
+        return <EncoderTool />;
       default:
         return null;
     }
@@ -334,12 +296,17 @@ export default function App() {
         onThemeChange={setTheme}
       />
 
+      <ExportImportModal
+        open={exportImportOpen}
+        onClose={() => setExportImportOpen(false)}
+        defaultTab={exportImportTab}
+      />
+
       {/* Sidebar + main */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Sidebar */}
         <Sidebar
-          onExport={handleExport}
-          onImport={handleImport}
+          onExportImport={() => { setExportImportTab('export'); setExportImportOpen(true); }}
           onSettings={() => setSettingsOpen(true)}
         />
 

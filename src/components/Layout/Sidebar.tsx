@@ -10,9 +10,10 @@ import {
   Braces,
   Bookmark,
   Database,
+  Regex,
+  ShieldCheck,
+  ArrowUpDown,
   Settings,
-  Download,
-  Upload,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -56,15 +57,26 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Database',
     shortcut: 'Ctrl+4',
   },
+  {
+    type: 'regex-tester',
+    icon: <Regex size={18} />,
+    label: 'Regex Tester',
+    shortcut: 'Ctrl+5',
+  },
+  {
+    type: 'encoder',
+    icon: <ShieldCheck size={18} />,
+    label: 'Encoder / Hash',
+    shortcut: 'Ctrl+6',
+  },
 ];
 
 interface SidebarProps {
-  onExport: () => void;
-  onImport: () => void;
+  onExportImport: () => void;
   onSettings: () => void;
 }
 
-export function Sidebar({ onExport, onImport, onSettings }: SidebarProps) {
+export function Sidebar({ onExportImport, onSettings }: SidebarProps) {
   const { tabs, activeTabId, openFeature, sidebarCollapsed, toggleSidebar } =
     useAppStore();
   const { user, signout } = useAuthStore();
@@ -131,23 +143,13 @@ export function Sidebar({ onExport, onImport, onSettings }: SidebarProps) {
 
       {/* Bottom utilities */}
       <div className="flex flex-col gap-1 mt-auto">
-        <Tooltip content="Export data  Ctrl+Shift+E" position="right">
+        <Tooltip content="Export / Import  Ctrl+Shift+E" position="right">
           <button
-            onClick={onExport}
-            aria-label="Export data"
+            onClick={onExportImport}
+            aria-label="Export / Import"
             className="flex items-center justify-center w-10 h-10 rounded-lg text-gh-fg-subtle hover:text-gh-fg hover:bg-gh-subtle transition-colors"
           >
-            <Download size={16} />
-          </button>
-        </Tooltip>
-
-        <Tooltip content="Import data  Ctrl+Shift+I" position="right">
-          <button
-            onClick={onImport}
-            aria-label="Import data"
-            className="flex items-center justify-center w-10 h-10 rounded-lg text-gh-fg-subtle hover:text-gh-fg hover:bg-gh-subtle transition-colors"
-          >
-            <Upload size={16} />
+            <ArrowUpDown size={16} />
           </button>
         </Tooltip>
 

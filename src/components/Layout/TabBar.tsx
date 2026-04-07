@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { X, Plus, Send, Braces, Bookmark, Database } from 'lucide-react';
+import { X, Plus, Send, Braces, Bookmark, Database, Regex, ShieldCheck } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { TabType } from '../../types';
 
@@ -14,6 +14,8 @@ const TAB_ICONS: Record<TabType, React.ReactNode> = {
   'json-tools': <Braces size={12} />,
   snippets: <Bookmark size={12} />,
   database: <Database size={12} />,
+  'regex-tester': <Regex size={12} />,
+  encoder: <ShieldCheck size={12} />,
 };
 
 export function TabBar() {

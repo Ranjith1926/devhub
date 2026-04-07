@@ -7,14 +7,18 @@
 
 import React, { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
-import { FolderOpen, History, Trash2, RotateCcw } from 'lucide-react';
+import { FolderOpen, History, Trash2, RotateCcw, FlaskConical, ChevronDown } from 'lucide-react';
 import { RequestBuilder } from './RequestBuilder';
 import { ResponseViewer } from './ResponseViewer';
 import { Collections } from './Collections';
+import { EnvironmentManager } from './EnvironmentManager';
 import { Button } from '../../components/ui/Button';
 import { MethodBadge } from '../../components/ui/Badge';
 import { useApiStore } from '../../store/apiStore';
+import { useEnvStore } from '../../store/envStore';
 import { useToast } from '../../hooks/useToast';
+import { interpolate } from '../../lib/interpolate';
+import { runAssertions } from '../../lib/assertions';
 import { ApiResponse, HistoryEntry } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -22,10 +26,9 @@ import { v4 as uuidv4 } from 'uuid';
 // History side-panel
 // ---------------------------------------------------------------------------
 
-function HistoryPanel() {
-  const { history, clearHistory, loadRequest: _load, request } = useApiStore();
+function HistoryPanel({ tabId }: { tabId: string }) {
+  const { history, clearHistory, setUrl, setMethod } = useApiStore();
   const toast = useToast();
-  const { setUrl, setMethod } = useApiStore();
 
   const handleClear = async () => {
     try {
@@ -61,8 +64,8 @@ function HistoryPanel() {
               key={entry.id}
               className="flex items-center gap-2 px-2 py-1.5 hover:bg-gh-subtle cursor-pointer border-b border-gh-border/30"
               onClick={() => {
-                setMethod(entry.method as any);
-                setUrl(entry.url);
+                setMethod(tabId, entry.method);
+                setUrl(tabId, entry.url);
               }}
               title={`${entry.method} ${entry.url}`}
             >
@@ -88,28 +91,55 @@ function HistoryPanel() {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function ApiTester() {
+interface ApiTesterProps {
+  tabId: string;
+}
+
+export function ApiTester({ tabId }: ApiTesterProps) {
   const {
-    request,
+    getRequest,
+    initRequestForTab,
+    isLoading,
     setResponse,
     setLoading,
-    loading,
     collectionsOpen,
     toggleCollections,
     prependHistory,
-    history,
     setHistory,
     resetRequest,
+    assertions,
+    setAssertionResults,
   } = useApiStore();
+  const request = getRequest(tabId);
+  const loading = isLoading(tabId);
+  const { environments, activeEnvId, setActiveEnv, activeEnv } = useEnvStore();
   const toast = useToast();
   const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [envManagerOpen, setEnvManagerOpen] = React.useState(false);
+  const [envDropdownOpen, setEnvDropdownOpen] = React.useState(false);
+  const envDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close env dropdown on outside click
+  React.useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (envDropdownRef.current && !envDropdownRef.current.contains(e.target as Node)) {
+        setEnvDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  React.useEffect(() => {
+    initRequestForTab(tabId);
+  }, [tabId, initRequestForTab]);
 
   // Load history from DB on mount (always refresh to reflect imports)
   React.useEffect(() => {
     invoke<any[]>('get_request_history')
       .then((h) => setHistory(h))
       .catch(() => {});
-  }, []);
+  }, [setHistory]);
 
   const sendRequest = useCallback(async () => {
     if (!request.url.trim()) {
@@ -117,38 +147,45 @@ export function ApiTester() {
       return;
     }
 
-    setLoading(true);
-    setResponse(null);
+    setLoading(tabId, true);
+    setResponse(tabId, null);
+
+    // Resolve active environment for interpolation
+    const env = activeEnv();
+
+    const applyEnv = (text: string) => interpolate(text, env).result;
 
     try {
-      // Only pass enabled, non-empty key-value pairs
+      // Only pass enabled, non-empty key-value pairs (interpolate values)
       const headers = request.headers
         .filter((h) => h.enabled && h.key.trim())
-        .map((h) => [h.key, h.value] as [string, string]);
+        .map((h) => [applyEnv(h.key), applyEnv(h.value)] as [string, string]);
 
       const params = request.params
         .filter((p) => p.enabled && p.key.trim())
-        .map((p) => [p.key, p.value] as [string, string]);
+        .map((p) => [applyEnv(p.key), applyEnv(p.value)] as [string, string]);
 
-      // Inject auth
+      // Inject auth (also interpolate token/key values)
       const { auth } = request;
       if (auth.type === 'bearer' && auth.token.trim()) {
-        headers.push(['Authorization', `Bearer ${auth.token.trim()}`]);
+        headers.push(['Authorization', `Bearer ${applyEnv(auth.token.trim())}`]);
       } else if (auth.type === 'basic' && (auth.username || auth.password)) {
-        const encoded = btoa(`${auth.username}:${auth.password}`);
+        const encoded = btoa(`${applyEnv(auth.username)}:${applyEnv(auth.password)}`);
         headers.push(['Authorization', `Basic ${encoded}`]);
       } else if (auth.type === 'api-key' && auth.apiKeyName.trim() && auth.apiKeyValue.trim()) {
         if (auth.apiKeyIn === 'header') {
-          headers.push([auth.apiKeyName.trim(), auth.apiKeyValue.trim()]);
+          headers.push([applyEnv(auth.apiKeyName.trim()), applyEnv(auth.apiKeyValue.trim())]);
         } else {
-          params.push([auth.apiKeyName.trim(), auth.apiKeyValue.trim()]);
+          params.push([applyEnv(auth.apiKeyName.trim()), applyEnv(auth.apiKeyValue.trim())]);
         }
       }
+
+      const resolvedUrl = applyEnv(request.url);
 
       const resp = await invoke<ApiResponse>('make_http_request', {
         config: {
           method: request.method,
-          url: request.url,
+          url: resolvedUrl,
           headers,
           params,
           body: (request.bodyType !== 'none' && request.bodyType !== 'form') ? request.body : null,
@@ -168,13 +205,17 @@ export function ApiTester() {
         },
       });
 
-      setResponse(resp);
+      setResponse(tabId, resp);
+
+      // Run assertions against the response
+      const results = runAssertions(assertions, resp);
+      setAssertionResults(results);
 
       // Persist to history
       const entry: HistoryEntry = {
         id: uuidv4(),
         method: request.method,
-        url: request.url,
+        url: resolvedUrl,
         status: resp.status,
         response_time: resp.time,
         created_at: new Date().toISOString(),
@@ -189,16 +230,21 @@ export function ApiTester() {
       }).catch(() => {}); // best-effort
     } catch (e) {
       toast.error(`Request failed: ${e}`);
-      setResponse(null);
+      setResponse(tabId, null);
     } finally {
-      setLoading(false);
+      setLoading(tabId, false);
     }
-  }, [request, setResponse, setLoading, prependHistory, toast]);
+  }, [request, activeEnv, tabId, setResponse, setLoading, prependHistory, toast, assertions, setAssertionResults]);
+
+  const currentEnv = environments.find((e) => e.id === activeEnvId) ?? null;
 
   return (
     <div className="flex h-full overflow-hidden">
       {/* Collections panel */}
-      {collectionsOpen && <Collections />}
+      {collectionsOpen && <Collections tabId={tabId} />}
+
+      {/* Environment Manager modal */}
+      <EnvironmentManager open={envManagerOpen} onClose={() => setEnvManagerOpen(false)} />
 
       {/* Center: request + response in a resizable split */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -223,11 +269,79 @@ export function ApiTester() {
             History
           </Button>
           <div className="flex-1" />
+
+          {/* Environment selector */}
+          <div ref={envDropdownRef} className="relative">
+            <button
+              onClick={() => setEnvDropdownOpen((v) => !v)}
+              className={[
+                'flex items-center gap-1.5 h-6 px-2.5 rounded border text-xs transition-colors',
+                currentEnv
+                  ? 'border-gh-success/50 bg-gh-success/10 text-gh-success hover:bg-gh-success/15'
+                  : 'border-gh-border bg-gh-subtle text-gh-fg-muted hover:text-gh-fg hover:bg-gh-overlay',
+              ].join(' ')}
+              title="Select environment"
+            >
+              <FlaskConical size={11} />
+              <span className="max-w-[120px] truncate">{currentEnv ? currentEnv.name : 'No Environment'}</span>
+              <ChevronDown size={10} />
+            </button>
+
+            {envDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-gh-border bg-gh-overlay shadow-lg z-50 py-1 overflow-hidden">
+                {/* No environment option */}
+                <button
+                  onClick={() => { setActiveEnv(null); setEnvDropdownOpen(false); }}
+                  className={[
+                    'w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gh-subtle transition-colors',
+                    !activeEnvId ? 'text-gh-fg' : 'text-gh-fg-muted',
+                  ].join(' ')}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full border border-gh-border" />
+                  No Environment
+                </button>
+
+                {environments.length > 0 && (
+                  <div className="my-1 border-t border-gh-border" />
+                )}
+
+                {environments.map((env) => (
+                  <button
+                    key={env.id}
+                    onClick={() => { setActiveEnv(env.id); setEnvDropdownOpen(false); }}
+                    className={[
+                      'w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gh-subtle transition-colors',
+                      activeEnvId === env.id ? 'text-gh-fg' : 'text-gh-fg-muted',
+                    ].join(' ')}
+                  >
+                    <span
+                      className={[
+                        'w-1.5 h-1.5 rounded-full shrink-0',
+                        activeEnvId === env.id ? 'bg-gh-success' : 'border border-gh-border',
+                      ].join(' ')}
+                    />
+                    <span className="truncate">{env.name}</span>
+                    <span className="ml-auto text-gh-fg-subtle">{env.variables.filter(v => v.enabled).length} vars</span>
+                  </button>
+                ))}
+
+                <div className="my-1 border-t border-gh-border" />
+                <button
+                  onClick={() => { setEnvDropdownOpen(false); setEnvManagerOpen(true); }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gh-accent hover:bg-gh-subtle transition-colors"
+                >
+                  <FlaskConical size={11} />
+                  Manage Environments
+                </button>
+              </div>
+            )}
+          </div>
+
           <Button
             variant="ghost"
             size="xs"
             icon={<RotateCcw size={13} />}
-            onClick={() => { resetRequest(); setResponse(null); }}
+            onClick={() => { resetRequest(tabId); setResponse(tabId, null); }}
             title="Reset request"
           >
             Reset
@@ -238,18 +352,18 @@ export function ApiTester() {
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Request Builder */}
           <div className="w-1/2 border-r border-gh-border overflow-hidden flex flex-col">
-            <RequestBuilder onSend={sendRequest} />
+            <RequestBuilder tabId={tabId} onSend={sendRequest} />
           </div>
 
           {/* Response Viewer */}
           <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
-            <ResponseViewer />
+            <ResponseViewer tabId={tabId} />
           </div>
         </div>
       </div>
 
       {/* History panel */}
-      {historyOpen && <HistoryPanel />}
+      {historyOpen && <HistoryPanel tabId={tabId} />}
     </div>
   );
 }
