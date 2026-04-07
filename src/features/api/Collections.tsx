@@ -24,7 +24,11 @@ import { useApiStore } from '../../store/apiStore';
 import { useToast } from '../../hooks/useToast';
 import { ApiCollection, SavedRequest } from '../../types';
 
-export function Collections() {
+interface CollectionsProps {
+  tabId: string;
+}
+
+export function Collections({ tabId }: CollectionsProps) {
   const toast = useToast();
   const {
     collections,
@@ -33,10 +37,11 @@ export function Collections() {
     removeCollection,
     addRequestToCollection,
     removeRequestFromCollection,
-    request,
+    getRequest,
     loadRequest,
     toggleCollections,
   } = useApiStore();
+  const request = getRequest(tabId);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [newCollModal, setNewCollModal] = useState(false);
@@ -224,7 +229,7 @@ export function Collections() {
                       <div
                         key={r.id}
                         className="group flex items-center gap-2 pl-8 pr-2 py-1 hover:bg-gh-subtle cursor-pointer"
-                        onClick={() => loadRequest(r)}
+                        onClick={() => loadRequest(tabId, r)}
                       >
                         <MethodBadge method={r.method} />
                         <span className="text-xs text-gh-fg truncate flex-1">{r.name}</span>

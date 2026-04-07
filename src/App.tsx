@@ -243,14 +243,21 @@ export default function App() {
 
   // Show auth page when no user is logged in
   if (!user) {
-    return <AuthPage />;
+    return (
+      <div className="flex flex-col h-screen w-screen overflow-hidden bg-gh-canvas text-gh-fg font-sans">
+        <TitleBar />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <AuthPage />
+        </div>
+      </div>
+    );
   }
 
   function renderPanel() {
     if (!activeTab) return null;
     switch (activeTab.type) {
       case 'api-tester':
-        return <ApiTester />;
+        return <ApiTester key={activeTab.id} tabId={activeTab.id} />;
       case 'json-tools':
         return <JsonTools />;
       case 'snippets':

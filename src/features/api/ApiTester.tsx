@@ -26,10 +26,9 @@ import { v4 as uuidv4 } from 'uuid';
 // History side-panel
 // ---------------------------------------------------------------------------
 
-function HistoryPanel() {
-  const { history, clearHistory, loadRequest: _load, request } = useApiStore();
+function HistoryPanel({ tabId }: { tabId: string }) {
+  const { history, clearHistory, setUrl, setMethod } = useApiStore();
   const toast = useToast();
-  const { setUrl, setMethod } = useApiStore();
 
   const handleClear = async () => {
     try {
@@ -65,8 +64,8 @@ function HistoryPanel() {
               key={entry.id}
               className="flex items-center gap-2 px-2 py-1.5 hover:bg-gh-subtle cursor-pointer border-b border-gh-border/30"
               onClick={() => {
-                setMethod(entry.method as any);
-                setUrl(entry.url);
+                setMethod(tabId, entry.method);
+                setUrl(tabId, entry.url);
               }}
               title={`${entry.method} ${entry.url}`}
             >
@@ -92,21 +91,27 @@ function HistoryPanel() {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function ApiTester() {
+interface ApiTesterProps {
+  tabId: string;
+}
+
+export function ApiTester({ tabId }: ApiTesterProps) {
   const {
-    request,
+    getRequest,
+    initRequestForTab,
+    isLoading,
     setResponse,
     setLoading,
-    loading,
     collectionsOpen,
     toggleCollections,
     prependHistory,
-    history,
     setHistory,
     resetRequest,
     assertions,
     setAssertionResults,
   } = useApiStore();
+  const request = getRequest(tabId);
+  const loading = isLoading(tabId);
   const { environments, activeEnvId, setActiveEnv, activeEnv } = useEnvStore();
   const toast = useToast();
   const [historyOpen, setHistoryOpen] = React.useState(false);
@@ -125,12 +130,16 @@ export function ApiTester() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  React.useEffect(() => {
+    initRequestForTab(tabId);
+  }, [tabId, initRequestForTab]);
+
   // Load history from DB on mount (always refresh to reflect imports)
   React.useEffect(() => {
     invoke<any[]>('get_request_history')
       .then((h) => setHistory(h))
       .catch(() => {});
-  }, []);
+  }, [setHistory]);
 
   const sendRequest = useCallback(async () => {
     if (!request.url.trim()) {
@@ -138,8 +147,8 @@ export function ApiTester() {
       return;
     }
 
-    setLoading(true);
-    setResponse(null);
+    setLoading(tabId, true);
+    setResponse(tabId, null);
 
     // Resolve active environment for interpolation
     const env = activeEnv();
@@ -196,7 +205,7 @@ export function ApiTester() {
         },
       });
 
-      setResponse(resp);
+      setResponse(tabId, resp);
 
       // Run assertions against the response
       const results = runAssertions(assertions, resp);
@@ -221,18 +230,18 @@ export function ApiTester() {
       }).catch(() => {}); // best-effort
     } catch (e) {
       toast.error(`Request failed: ${e}`);
-      setResponse(null);
+      setResponse(tabId, null);
     } finally {
-      setLoading(false);
+      setLoading(tabId, false);
     }
-  }, [request, activeEnv, setResponse, setLoading, prependHistory, toast, assertions, setAssertionResults]);
+  }, [request, activeEnv, tabId, setResponse, setLoading, prependHistory, toast, assertions, setAssertionResults]);
 
   const currentEnv = environments.find((e) => e.id === activeEnvId) ?? null;
 
   return (
     <div className="flex h-full overflow-hidden">
       {/* Collections panel */}
-      {collectionsOpen && <Collections />}
+      {collectionsOpen && <Collections tabId={tabId} />}
 
       {/* Environment Manager modal */}
       <EnvironmentManager open={envManagerOpen} onClose={() => setEnvManagerOpen(false)} />
@@ -332,7 +341,7 @@ export function ApiTester() {
             variant="ghost"
             size="xs"
             icon={<RotateCcw size={13} />}
-            onClick={() => { resetRequest(); setResponse(null); }}
+            onClick={() => { resetRequest(tabId); setResponse(tabId, null); }}
             title="Reset request"
           >
             Reset
@@ -343,18 +352,18 @@ export function ApiTester() {
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Request Builder */}
           <div className="w-1/2 border-r border-gh-border overflow-hidden flex flex-col">
-            <RequestBuilder onSend={sendRequest} />
+            <RequestBuilder tabId={tabId} onSend={sendRequest} />
           </div>
 
           {/* Response Viewer */}
           <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
-            <ResponseViewer />
+            <ResponseViewer tabId={tabId} />
           </div>
         </div>
       </div>
 
       {/* History panel */}
-      {historyOpen && <HistoryPanel />}
+      {historyOpen && <HistoryPanel tabId={tabId} />}
     </div>
   );
 }

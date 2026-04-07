@@ -159,13 +159,14 @@ const METHOD_COLORS: Record<HttpMethod, string> = {
   OPTIONS: 'text-pink-600 dark:text-pink-400',
 };
 
-function MethodSelect() {
-  const { request, setMethod } = useApiStore();
+function MethodSelect({ tabId }: { tabId: string }) {
+  const { getRequest, setMethod } = useApiStore();
+  const request = getRequest(tabId);
   return (
     <div className="relative shrink-0">
       <select
         value={request.method}
-        onChange={(e) => setMethod(e.target.value as HttpMethod)}
+        onChange={(e) => setMethod(tabId, e.target.value as HttpMethod)}
         className={[
           'h-9 pl-2 pr-6 rounded-l-md border border-r-0 border-gh-border',
           'bg-gh-subtle text-xs font-semibold appearance-none cursor-pointer',
@@ -265,8 +266,9 @@ const AUTH_TYPES: { value: AuthType; label: string }[] = [
   { value: 'api-key', label: 'API Key' },
 ];
 
-function AuthEditor() {
-  const { request, setAuth } = useApiStore();
+function AuthEditor({ tabId }: { tabId: string }) {
+  const { getRequest, setAuth } = useApiStore();
+  const request = getRequest(tabId);
   const { auth } = request;
 
   return (
@@ -278,7 +280,7 @@ function AuthEditor() {
           {AUTH_TYPES.map((at) => (
             <button
               key={at.value}
-              onClick={() => setAuth({ type: at.value })}
+              onClick={() => setAuth(tabId, { type: at.value })}
               className={[
                 'px-3 py-1.5 text-xs transition-colors whitespace-nowrap',
                 auth.type === at.value
@@ -305,7 +307,7 @@ function AuthEditor() {
           <Input
             label="Token"
             value={auth.token}
-            onChange={(e) => setAuth({ token: e.target.value })}
+            onChange={(e) => setAuth(tabId, { token: e.target.value })}
             placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"
             rightElement={
               <span className="text-[10px] text-gh-fg-subtle font-mono pr-1">Bearer</span>
@@ -323,14 +325,14 @@ function AuthEditor() {
           <Input
             label="Username"
             value={auth.username}
-            onChange={(e) => setAuth({ username: e.target.value })}
+            onChange={(e) => setAuth(tabId, { username: e.target.value })}
             placeholder="username"
           />
           <Input
             label="Password"
             type="password"
             value={auth.password}
-            onChange={(e) => setAuth({ password: e.target.value })}
+            onChange={(e) => setAuth(tabId, { password: e.target.value })}
             placeholder="••••••••"
           />
           <p className="text-[11px] text-gh-fg-subtle">
@@ -347,7 +349,7 @@ function AuthEditor() {
               <Input
                 label="Key name"
                 value={auth.apiKeyName}
-                onChange={(e) => setAuth({ apiKeyName: e.target.value })}
+                onChange={(e) => setAuth(tabId, { apiKeyName: e.target.value })}
                 placeholder="X-API-Key"
               />
             </div>
@@ -355,7 +357,7 @@ function AuthEditor() {
               <Input
                 label="Value"
                 value={auth.apiKeyValue}
-                onChange={(e) => setAuth({ apiKeyValue: e.target.value })}
+                onChange={(e) => setAuth(tabId, { apiKeyValue: e.target.value })}
                 placeholder="your-key-here"
               />
             </div>
@@ -366,7 +368,7 @@ function AuthEditor() {
               {(['header', 'query'] as const).map((loc) => (
                 <button
                   key={loc}
-                  onClick={() => setAuth({ apiKeyIn: loc })}
+                  onClick={() => setAuth(tabId, { apiKeyIn: loc })}
                   className={[
                     'px-3 py-1.5 text-xs transition-colors capitalize',
                     auth.apiKeyIn === loc
@@ -396,8 +398,9 @@ const BODY_TYPES: { value: BodyType; label: string }[] = [
   { value: 'form', label: 'Form Data' },
 ];
 
-function BodyEditor() {
-  const { request, setBody, setBodyType } = useApiStore();
+function BodyEditor({ tabId }: { tabId: string }) {
+  const { getRequest, setBody, setBodyType } = useApiStore();
+  const request = getRequest(tabId);
 
   // Parse / serialise form fields stored as JSON in request.body
   const formFields: KeyValuePair[] = React.useMemo(() => {
@@ -410,7 +413,7 @@ function BodyEditor() {
   }, [request.body, request.bodyType]);
 
   const handleFormChange = (rows: KeyValuePair[]) => {
-    setBody(JSON.stringify(rows));
+    setBody(tabId, JSON.stringify(rows));
   };
 
   return (
@@ -421,11 +424,11 @@ function BodyEditor() {
           <button
             key={bt.value}
             onClick={() => {
-              setBodyType(bt.value);
+              setBodyType(tabId, bt.value);
               if (bt.value === 'form') {
-                setBody(JSON.stringify([{ id: uuidv4(), key: '', value: '', enabled: true }]));
+                setBody(tabId, JSON.stringify([{ id: uuidv4(), key: '', value: '', enabled: true }]));
               } else if (bt.value !== request.bodyType) {
-                setBody('');
+                setBody(tabId, '');
               }
             }}
             className={[
@@ -457,7 +460,7 @@ function BodyEditor() {
         <div className="flex-1 min-h-0">
           <CodeEditor
             value={request.body}
-            onChange={setBody}
+            onChange={(value) => setBody(tabId, value)}
             language={request.bodyType === 'json' ? 'json' : 'text'}
             height="100%"
             placeholder={
@@ -487,20 +490,23 @@ const REQUEST_TABS = ['Params', 'Headers', 'Body', 'Auth', 'Tests'] as const;
 type RequestTab = (typeof REQUEST_TABS)[number];
 
 interface RequestBuilderProps {
+  tabId: string;
   onSend: () => void;
 }
 
-export function RequestBuilder({ onSend }: RequestBuilderProps) {
+export function RequestBuilder({ tabId, onSend }: RequestBuilderProps) {
   const {
-    request,
+    getRequest,
     setUrl,
     setHeaders,
     setParams,
     assertions,
     activeRequestTab,
     setActiveRequestTab,
-    loading,
+    isLoading,
   } = useApiStore();
+  const request = getRequest(tabId);
+  const loading = isLoading(tabId);
   const { activeEnv } = useEnvStore();
   const env = activeEnv();
 
@@ -520,10 +526,10 @@ export function RequestBuilder({ onSend }: RequestBuilderProps) {
     <div className="flex flex-col h-full">
       {/* URL bar */}
       <div className="flex items-center gap-0 p-3 pb-2 shrink-0">
-        <MethodSelect />
+        <MethodSelect tabId={tabId} />
         <input
           value={request.url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => setUrl(tabId, e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && onSend()}
           placeholder="https://api.example.com/endpoint  or  {{baseUrl}}/endpoint"
           className="flex-1 h-9 px-3 border border-gh-border bg-gh-overlay text-sm text-gh-fg placeholder:text-gh-fg-subtle focus:outline-none focus:border-gh-accent font-mono"
@@ -613,7 +619,7 @@ export function RequestBuilder({ onSend }: RequestBuilderProps) {
         {activeRequestTab === 'params' && (
           <KVTable
             rows={request.params}
-            onChange={setParams}
+            onChange={(rows) => setParams(tabId, rows)}
             keyPlaceholder="param"
             valuePlaceholder="value"
           />
@@ -621,13 +627,13 @@ export function RequestBuilder({ onSend }: RequestBuilderProps) {
         {activeRequestTab === 'headers' && (
           <KVTable
             rows={request.headers}
-            onChange={setHeaders}
+            onChange={(rows) => setHeaders(tabId, rows)}
             keyPlaceholder="Header-Name"
             valuePlaceholder="value"
           />
         )}
-        {activeRequestTab === 'body' && <BodyEditor />}
-        {activeRequestTab === 'auth' && <AuthEditor />}
+        {activeRequestTab === 'body' && <BodyEditor tabId={tabId} />}
+        {activeRequestTab === 'auth' && <AuthEditor tabId={tabId} />}
         {activeRequestTab === 'tests' && <TestsEditor />}
       </div>
     </div>

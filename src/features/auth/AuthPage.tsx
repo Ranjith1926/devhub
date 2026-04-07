@@ -31,7 +31,7 @@ export function AuthPage() {
   }, [setUser]);
 
   return (
-    <div className="relative flex h-screen w-screen items-center justify-center bg-gh-canvas overflow-hidden">
+    <div className="relative flex h-full w-full items-center justify-center bg-gh-canvas overflow-hidden">
 
       {/* ── Animated background blobs ── */}
       <div aria-hidden className="pointer-events-none absolute inset-0">

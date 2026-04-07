@@ -45,8 +45,14 @@ function prettyJson(raw: string): string {
 
 type ResponseTab = 'body' | 'headers' | 'tests';
 
-export function ResponseViewer() {
-  const { response, loading, assertionResults, assertions } = useApiStore();
+interface ResponseViewerProps {
+  tabId: string;
+}
+
+export function ResponseViewer({ tabId }: ResponseViewerProps) {
+  const { getResponse, isLoading, assertionResults, assertions } = useApiStore();
+  const response = getResponse(tabId);
+  const loading = isLoading(tabId);
   const toast = useToast();
   const [tab, setTab] = useState<ResponseTab>('body');
   const [pretty, setPretty] = useState(true);
