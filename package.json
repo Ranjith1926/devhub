@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "license:keys": "node scripts/generate-license-keys.mjs",
+    "license:create": "node scripts/create-license.mjs",
+    "license:verify": "node scripts/verify-license.mjs"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.2.1",
